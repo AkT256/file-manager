@@ -1,0 +1,27 @@
+Файловый менеджер запущен. Введите help для списка команд.
+[.] > mkdir docs
+Директория создана: docs
+[.] > cd docs
+Текущая директория: docs
+[docs] > touch note.txt
+Файл создан: note.txt
+[docs] > write note.txt Привет, это тестовый файл.
+Данные записаны в файл: note.txt
+[docs] > cat note.txt
+Привет, это тестовый файл.
+[docs] > append note.txt \nДобавленная строка.
+Данные добавлены в файл: note.txt
+[docs] > ls
+[FILE] note.txt
+[docs] > info note.txt
+Имя: note.txt
+Тип: файл
+Путь: docs/note.txt
+Размер: 47 байт
+[docs] > cd ..
+Текущая директория: .
+[.] > tree
+└── docs
+    └── note.txt
+[.] > exit
+Завершение работы.
