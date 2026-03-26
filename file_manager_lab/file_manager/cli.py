@@ -66,6 +66,13 @@ class CommandLineInterface:
             case 'info':
                 self._expect_args(args, 1)
                 return self.manager.info(args[0])
+            case 'zip':
+                self._expect_args(args, 2)
+                return self.manager.zip_item(args[0], args[1])
+            case 'unzip':
+                self._expect_args(args, 1)
+                destination = args[1] if len(args) > 1 else '.'
+                return self.manager.unzip_item(args[0], destination)
             case 'exit':
                 raise SystemExit
             case _:

@@ -5,7 +5,8 @@ import shutil
 from typing import Iterable
 
 from .exceptions import FileManagerError, PathOutsideWorkspaceError
-
+import zipfile
+from pathlib import Path
 
 class FileManager:
     """Файловый менеджер с ограничением действий внутри workspace."""
@@ -90,8 +91,10 @@ class FileManager:
     def write(self, name: str, content: str) -> str:
         path = self._resolve_path(name)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding='utf-8')
-        return f'Данные записаны в файл: {path.name}'
+        content_bytes = len(content.encode("utf-8"))
+        self.check_quota(content_bytes)
+        path.write_text(content, encoding="utf-8")
+        return f"Данные записаны в файл: {path.name}"
 
     def append(self, name: str, content: str) -> str:
         path = self._resolve_path(name)
@@ -140,15 +143,22 @@ class FileManager:
 
     def info(self, name: str) -> str:
         path = self._resolve_path(name)
+
         if not path.exists():
             raise FileManagerError('Ошибка: объект не найден.')
-        stat = path.stat()
+
         item_type = 'директория' if path.is_dir() else 'файл'
+
+        if path.is_file():
+            size = path.stat().st_size
+        else:
+            size = self.get_directory_size(path)
+
         return (
             f'Имя: {path.name}\n'
             f'Тип: {item_type}\n'
             f'Путь: {path.relative_to(self.workspace_root)}\n'
-            f'Размер: {stat.st_size} байт'
+            f'Размер: {size} байт'
         )
 
     def help(self) -> str:
@@ -169,6 +179,55 @@ class FileManager:
             'mv <источник> <назначение>        - переместить файл/папку',
             'rename <источник> <новое_имя>     - переименовать файл/папку',
             'info <имя>                        - показать информацию об объекте',
+            'zip <источник> <архив.zip>        - архивировать файл или папку',
+            'unzip <архив.zip> [папка]         - распаковать архив',
             'exit                              - выход из программы',
         )
         return '\n'.join(commands)
+    
+    def zip_item(self, src_path: str, zip_path: str) -> str:
+        src = self._resolve_path(src_path)
+        zip_path_obj = self._resolve_path(zip_path)
+
+        with zipfile.ZipFile(zip_path_obj, 'w', zipfile.ZIP_DEFLATED) as zf:
+            if src.is_file():
+                zf.write(src, arcname=src.name)
+            else:
+                for file in src.rglob('*'):
+                    if file.is_file():
+                        zf.write(file, arcname=file.relative_to(src))
+
+        return f'Создан архив: {zip_path_obj.name}'
+
+
+    def unzip_item(self, zip_path: str, extract_to: str = '.') -> str:
+        zip_path_obj = self._resolve_path(zip_path)
+        extract_to_obj = self._resolve_path(extract_to)
+        extract_to_obj.mkdir(parents=True, exist_ok=True)
+
+        with zipfile.ZipFile(zip_path_obj, 'r') as zf:
+            zf.extractall(extract_to_obj)
+
+        return f'Архив распакован в: {extract_to_obj.name}'
+
+
+    def get_directory_size(self, path: Path | None = None) -> int:
+        target = path if path is not None else self.workspace_root
+        total = 0
+
+        for p in Path(target).rglob('*'):
+            if p.is_file():
+                total += p.stat().st_size
+
+        return total
+
+
+    def check_quota(self, new_file_size: int = 0) -> None:
+        from config import MAX_SIZE_MB
+
+        current_size = self.get_directory_size()
+        limit = MAX_SIZE_MB * 1024 * 1024
+
+        if current_size + new_file_size > limit:
+            raise FileManagerError('Превышен лимит дискового пространства')
+        
