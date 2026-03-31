@@ -12,11 +12,13 @@ class FileManager:
     """Файловый менеджер с ограничением действий внутри workspace."""
 
     def __init__(self, workspace_root: Path):
+        """Инициализирует менеджер с корневой директорией."""
         self.workspace_root = workspace_root.resolve()
         self.workspace_root.mkdir(parents=True, exist_ok=True)
         self.current_dir = self.workspace_root
 
     def _resolve_path(self, raw_path: str | None = None) -> Path:
+        """Преобразует путь в абсолютный путь с проверкой workspace."""
         if not raw_path or raw_path == '.':
             candidate = self.current_dir
         else:
@@ -26,6 +28,7 @@ class FileManager:
         return candidate
 
     def _ensure_inside_workspace(self, path: Path) -> None:
+        """Проверяет, что путь находится внутри workspace."""
         try:
             path.relative_to(self.workspace_root)
         except ValueError as exc:
@@ -34,9 +37,11 @@ class FileManager:
             ) from exc
 
     def pwd(self) -> str:
+        """Возвращает текущую директорию."""
         return str(self.current_dir.relative_to(self.workspace_root)) or '.'
 
     def ls(self) -> list[str]:
+        """Выводит содержимое текущей директории."""
         items = []
         for item in sorted(self.current_dir.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
             prefix = '[DIR]' if item.is_dir() else '[FILE]'
@@ -44,6 +49,7 @@ class FileManager:
         return items
 
     def cd(self, raw_path: str) -> str:
+        """Переходит в указанную директорию."""
         target = self._resolve_path(raw_path)
         if not target.exists():
             raise FileManagerError('Ошибка: директория не существует.')
@@ -53,11 +59,13 @@ class FileManager:
         return f'Текущая директория: {self.pwd()}'
 
     def mkdir(self, name: str) -> str:
+        """Создаёт новую директорию."""
         path = self._resolve_path(name)
         path.mkdir(parents=True, exist_ok=False)
         return f'Директория создана: {path.name}'
 
     def rmdir(self, name: str) -> str:
+        """Удаляет пустую директорию."""
         path = self._resolve_path(name)
         if not path.exists() or not path.is_dir():
             raise FileManagerError('Ошибка: директория не найдена.')
@@ -65,6 +73,7 @@ class FileManager:
         return f'Директория удалена: {path.name}'
 
     def tree(self, start: Path | None = None, prefix: str = '') -> list[str]:
+        """Выводит дерево структуры директорий."""
         directory = start or self.current_dir
         entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
         lines: list[str] = []
@@ -77,18 +86,21 @@ class FileManager:
         return lines
 
     def touch(self, name: str) -> str:
+        """Создаёт пустой файл."""
         path = self._resolve_path(name)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch(exist_ok=True)
         return f'Файл создан: {path.name}'
 
     def cat(self, name: str) -> str:
+        """Выводит содержимое файла."""
         path = self._resolve_path(name)
         if not path.exists() or not path.is_file():
             raise FileManagerError('Ошибка: файл не найден.')
         return path.read_text(encoding='utf-8')
 
     def write(self, name: str, content: str) -> str:
+        """Записывает содержимое в файл (перезаписывает)."""
         path = self._resolve_path(name)
         path.parent.mkdir(parents=True, exist_ok=True)
         content_bytes = len(content.encode("utf-8"))
@@ -97,6 +109,7 @@ class FileManager:
         return f"Данные записаны в файл: {path.name}"
 
     def append(self, name: str, content: str) -> str:
+        """Добавляет содержимое в конец файла."""
         path = self._resolve_path(name)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('a', encoding='utf-8') as file:
@@ -104,6 +117,7 @@ class FileManager:
         return f'Данные добавлены в файл: {path.name}'
 
     def rm(self, name: str) -> str:
+        """Удаляет файл."""
         path = self._resolve_path(name)
         if not path.exists() or not path.is_file():
             raise FileManagerError('Ошибка: файл не найден.')
@@ -111,6 +125,7 @@ class FileManager:
         return f'Файл удалён: {path.name}'
 
     def cp(self, source: str, destination: str) -> str:
+        """Копирует файл или директорию."""
         source_path = self._resolve_path(source)
         destination_path = self._resolve_path(destination)
         if not source_path.exists():
@@ -124,6 +139,7 @@ class FileManager:
         return f'Скопировано: {source} -> {destination}'
 
     def mv(self, source: str, destination: str) -> str:
+        """Перемещает файл или директорию."""
         source_path = self._resolve_path(source)
         destination_path = self._resolve_path(destination)
         if not source_path.exists():
@@ -133,6 +149,7 @@ class FileManager:
         return f'Перемещено: {source} -> {destination}'
 
     def rename(self, source: str, new_name: str) -> str:
+        """Переименовывает файл или директорию."""
         source_path = self._resolve_path(source)
         if not source_path.exists():
             raise FileManagerError('Ошибка: исходный путь не найден.')
@@ -142,6 +159,7 @@ class FileManager:
         return f'Переименовано: {source_path.name} -> {target.name}'
 
     def info(self, name: str) -> str:
+        """Выводит информацию об объекте (файле или директории)."""
         path = self._resolve_path(name)
 
         if not path.exists():
@@ -162,6 +180,7 @@ class FileManager:
         )
 
     def help(self) -> str:
+        """Выводит список доступных команд."""
         commands: Iterable[str] = (
             'help                              - показать список команд',
             'pwd                               - показать текущую директорию',
@@ -186,6 +205,7 @@ class FileManager:
         return '\n'.join(commands)
     
     def zip_item(self, src_path: str, zip_path: str) -> str:
+        """Архивирует файл или директорию в ZIP."""
         src = self._resolve_path(src_path)
         zip_path_obj = self._resolve_path(zip_path)
 
@@ -201,6 +221,7 @@ class FileManager:
 
 
     def unzip_item(self, zip_path: str, extract_to: str = '.') -> str:
+        """Распаковывает ZIP архив."""
         zip_path_obj = self._resolve_path(zip_path)
         extract_to_obj = self._resolve_path(extract_to)
         extract_to_obj.mkdir(parents=True, exist_ok=True)
@@ -212,6 +233,7 @@ class FileManager:
 
 
     def get_directory_size(self, path: Path | None = None) -> int:
+        """Вычисляет общий размер директории."""
         target = path if path is not None else self.workspace_root
         total = 0
 
@@ -223,6 +245,7 @@ class FileManager:
 
 
     def check_quota(self, new_file_size: int = 0) -> None:
+        """Проверяет не превышен ли лимит дискового пространства."""
         from config import MAX_SIZE_MB
 
         current_size = self.get_directory_size()
